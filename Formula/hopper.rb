@@ -1,7 +1,7 @@
 class Hopper < Formula
   desc "nammayatri build network CLI"
   homepage "https://github.com/nammayatri/hopper"
-  version "1.0.0"
+  version "1.1.0"
 
   on_macos do
     if Hardware::CPU.arm?
