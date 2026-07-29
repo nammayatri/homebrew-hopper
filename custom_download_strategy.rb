@@ -57,25 +57,19 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
 
   def set_github_token
     @github_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
+    return if @github_token
 
-    unless @github_token
-      @github_token = load_cached_token
-      if @github_token
-        ohai "Using saved GitHub token from #{token_cache_path}"
-        return
-      end
-    end
-
-    unless @github_token
-      @github_token = prompt_for_token
-      raise CurlDownloadStrategyError, "GitHub token is required to access private repository." if @github_token.nil? || @github_token.empty?
-      validate_github_repository_access!
-      save_token(@github_token)
-      ohai "Token saved to #{token_cache_path} for future use."
+    @github_token = load_cached_token
+    if @github_token
+      ohai "Using saved GitHub token from #{token_cache_path}"
       return
     end
 
+    @github_token = prompt_for_token
+    raise CurlDownloadStrategyError, "GitHub token is required to access private repository." if @github_token.nil? || @github_token.empty?
     validate_github_repository_access!
+    save_token(@github_token)
+    ohai "Token saved to #{token_cache_path} for future use."
   end
 
   def validate_github_repository_access!
