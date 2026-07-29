@@ -27,11 +27,61 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
     curl_download download_url, to: temporary_path, timeout: timeout
   end
 
+  def token_cache_path
+    Pathname.new(Dir.home) / ".config" / "homebrew-hopper" / "github_token"
+  end
+
+  def load_cached_token
+    return nil unless token_cache_path.exist?
+    token_cache_path.read.strip
+  end
+
+  def save_token(token)
+    token_cache_path.dirname.mkpath
+    token_cache_path.write(token)
+    token_cache_path.chmod(0o600)
+  end
+
+  def clear_cached_token
+    token_cache_path.delete if token_cache_path.exist?
+  end
+
+  def prompt_for_token
+    require "io/console"
+    ohai "GitHub Personal Access Token required to download #{@owner}/#{@repo}"
+    $stderr.print "Enter your GitHub token (input hidden): "
+    token = $stdin.noecho(&:gets)&.chomp
+    $stderr.puts
+    token
+  end
+
   def set_github_token
     @github_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
+
     unless @github_token
-      raise CurlDownloadStrategyError, "Environmental variable HOMEBREW_GITHUB_API_TOKEN is required."
+      @github_token = load_cached_token
+      if @github_token
+        ohai "Using saved GitHub token from #{token_cache_path}"
+        begin
+          validate_github_repository_access!
+          return
+        rescue CurlDownloadStrategyError
+          opoo "Saved token is invalid or expired, clearing it."
+          clear_cached_token
+          @github_token = nil
+        end
+      end
     end
+
+    unless @github_token
+      @github_token = prompt_for_token
+      raise CurlDownloadStrategyError, "GitHub token is required to access private repository." if @github_token.nil? || @github_token.empty?
+      validate_github_repository_access!
+      save_token(@github_token)
+      ohai "Token saved to #{token_cache_path} for future use."
+      return
+    end
+
     validate_github_repository_access!
   end
 
