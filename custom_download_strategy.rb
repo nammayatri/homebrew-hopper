@@ -62,14 +62,7 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
       @github_token = load_cached_token
       if @github_token
         ohai "Using saved GitHub token from #{token_cache_path}"
-        begin
-          validate_github_repository_access!
-          return
-        rescue CurlDownloadStrategyError
-          opoo "Saved token is invalid or expired, clearing it."
-          clear_cached_token
-          @github_token = nil
-        end
+        return
       end
     end
 
