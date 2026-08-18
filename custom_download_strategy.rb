@@ -1,8 +1,9 @@
 require "download_strategy"
+require "net/http"
+require "uri"
 
 class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
   require "utils/formatter"
-  require "utils/github"
 
   def initialize(url, name, version, **meta)
     super
@@ -72,16 +73,34 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
     ohai "Token saved to #{token_cache_path} for future use."
   end
 
+  # Bypasses Homebrew's own internal `GitHub` API client entirely —
+  # that class resolves credentials from Homebrew's own environment
+  # (HOMEBREW_GITHUB_API_TOKEN, `gh` CLI auth, etc.), completely
+  # independent of @github_token above. On a machine where that's never
+  # been configured (any fresh Linux box, for instance), this used to
+  # 401/404 as an anonymous request regardless of how correct the token
+  # just typed into the prompt was — a real, confirmed bug (proven via a
+  # direct `curl` with the same token succeeding where this failed).
+  # Plain authenticated HTTP with the actual token instead, no reliance
+  # on any of Homebrew's own ambient GitHub auth state.
+  def github_api_get(path)
+    uri = URI("https://api.github.com#{path}")
+    req = Net::HTTP::Get.new(uri)
+    req["Authorization"] = "token #{@github_token}"
+    req["User-Agent"] = "Homebrew"
+    req["Accept"] = "application/vnd.github+json"
+    Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
+  end
+
   def validate_github_repository_access!
-    GitHub.repository(@owner, @repo)
-  rescue GitHub::API::HTTPNotFoundError, GitHub::API::HTTPUnauthorizedError
+    res = github_api_get("/repos/#{@owner}/#{@repo}")
+    return if res.is_a?(Net::HTTPSuccess)
+
     message = <<~EOS
       GitHub token cannot access the repository: #{@owner}/#{@repo}
       This token may not have permission to access the repository or the url of formula may be incorrect.
     EOS
     raise CurlDownloadStrategyError, message
-  rescue NameError
-    nil
   end
 end
 
@@ -119,7 +138,16 @@ class GitHubPrivateRepositoryReleaseDownloadStrategy < GitHubPrivateRepositoryDo
     assets.first["id"]
   end
 
+  # Same fix as validate_github_repository_access! above — was calling
+  # Homebrew's own internal GitHub client (GitHub.get_release) with no
+  # way to pass @github_token in, so it silently depended on Homebrew's
+  # own ambient credential state instead of the token actually entered.
   def fetch_release_metadata
-    GitHub.get_release(@owner, @repo, @tag)
+    require "json"
+    res = github_api_get("/repos/#{@owner}/#{@repo}/releases/tags/#{@tag}")
+    unless res.is_a?(Net::HTTPSuccess)
+      raise CurlDownloadStrategyError, "Could not fetch release #{@tag} for #{@owner}/#{@repo}: #{res.code} #{res.message}"
+    end
+    JSON.parse(res.body)
   end
 end
