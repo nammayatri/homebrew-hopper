@@ -3,20 +3,20 @@ require_relative "../custom_download_strategy"
 class Hopper < Formula
   desc "nammayatri build network CLI"
   homepage "https://github.com/nammayatri/hopper"
-  version "1.8.0"
+  version "1.9.0"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/nammayatri/hopper/releases/download/v1.8.0/hopper-darwin-arm64",
+      url "https://github.com/nammayatri/hopper/releases/download/v1.9.0/hopper-darwin-arm64",
           using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "6b01b7a79ceba3c49aa0763783eda73b632d50e20544f7d11314b2e968e59ec9"
+      sha256 "5b010110d867bde945e449a8b07a1c70ebae233fd94768afc7368c8926a11244"
     end
   end
 
   on_linux do
-    url "https://github.com/nammayatri/hopper/releases/download/v1.8.0/hopper-linux-amd64",
+    url "https://github.com/nammayatri/hopper/releases/download/v1.9.0/hopper-linux-amd64",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-    sha256 "0e01d1c1c8b42ece6a2606784e4048c0c971a77375c605c28db78f1d3c518d4c"
+    sha256 "88881c5bb59426af6e7c915bf95c9572b57e6e06b4f611a1a9bbf47f59bcfb38"
   end
 
   def install
