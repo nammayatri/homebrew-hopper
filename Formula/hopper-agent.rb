@@ -3,20 +3,20 @@ require_relative "../custom_download_strategy"
 class HopperAgent < Formula
   desc "NodeBackproxy agent — runs on provisioned fleet nodes, not developer machines"
   homepage "https://github.com/nammayatri/hopper"
-  version "0.1.3"
+  version "0.1.4"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/nammayatri/hopper/releases/download/internal-agent-v0.1.3/internal-agent-darwin-arm64",
+      url "https://github.com/nammayatri/hopper/releases/download/internal-agent-v0.1.4/internal-agent-darwin-arm64",
           using: GitHubPrivateRepositoryReleaseDownloadStrategy
-      sha256 "8dc386bc072a89f11a0eb9100b2394956e1618f42832e7603a1f6f62fd6a6d45"
+      sha256 "f636f7d4b678345d160950f307727908d6e95ce73ecb744cde5032c755df4010"
     end
   end
 
   on_linux do
-    url "https://github.com/nammayatri/hopper/releases/download/internal-agent-v0.1.3/internal-agent-linux-amd64",
+    url "https://github.com/nammayatri/hopper/releases/download/internal-agent-v0.1.4/internal-agent-linux-amd64",
         using: GitHubPrivateRepositoryReleaseDownloadStrategy
-    sha256 "8a5241ac26674f9f7abd9957c9b905c1acb1a45dd454107ed225ebef4c6cd517"
+    sha256 "dd57a525a40555afa179a8020177396210d8517bc96d8cfeeef13cd5f330306a"
   end
 
   def install
