@@ -57,20 +57,33 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
   end
 
   def set_github_token
-    @github_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
-    return if @github_token
+    candidates = []
+    env_token = ENV["HOMEBREW_GITHUB_API_TOKEN"]
+    candidates << [env_token, "HOMEBREW_GITHUB_API_TOKEN"] if env_token && !env_token.empty?
+    cached = load_cached_token
+    candidates << [cached, "saved GitHub token"] if cached && !cached.empty?
 
-    @github_token = load_cached_token
-    if @github_token
-      ohai "Using saved GitHub token from #{token_cache_path}"
-      return
+    candidates.each do |token, source|
+      @github_token = token
+      if github_token_valid?
+        ohai "Using #{source}" if source == "saved GitHub token"
+        return
+      end
+      opoo "#{source} was rejected by GitHub (expired, revoked or no access to #{@owner}/#{@repo})"
+      clear_cached_token if source == "saved GitHub token"
     end
 
-    @github_token = prompt_for_token
-    raise CurlDownloadStrategyError, "GitHub token is required to access private repository." if @github_token.nil? || @github_token.empty?
-    validate_github_repository_access!
-    save_token(@github_token)
-    ohai "Token saved to #{token_cache_path} for future use."
+    3.times do
+      @github_token = prompt_for_token
+      raise CurlDownloadStrategyError, "GitHub token is required to access private repository." if @github_token.nil? || @github_token.empty?
+      if github_token_valid?
+        save_token(@github_token)
+        ohai "Token saved to #{token_cache_path} for future use."
+        return
+      end
+      opoo "That token cannot access #{@owner}/#{@repo}. Needs repo (or Contents: read) access, authorized for the organization."
+    end
+    raise CurlDownloadStrategyError, "No valid GitHub token provided."
   end
 
   # Bypasses Homebrew's own internal `GitHub` API client entirely —
@@ -92,15 +105,10 @@ class GitHubPrivateRepositoryDownloadStrategy < CurlDownloadStrategy
     Net::HTTP.start(uri.hostname, uri.port, use_ssl: true) { |http| http.request(req) }
   end
 
-  def validate_github_repository_access!
-    res = github_api_get("/repos/#{@owner}/#{@repo}")
-    return if res.is_a?(Net::HTTPSuccess)
-
-    message = <<~EOS
-      GitHub token cannot access the repository: #{@owner}/#{@repo}
-      This token may not have permission to access the repository or the url of formula may be incorrect.
-    EOS
-    raise CurlDownloadStrategyError, message
+  def github_token_valid?
+    github_api_get("/repos/#{@owner}/#{@repo}").is_a?(Net::HTTPSuccess)
+  rescue StandardError
+    false
   end
 end
 
@@ -138,7 +146,7 @@ class GitHubPrivateRepositoryReleaseDownloadStrategy < GitHubPrivateRepositoryDo
     assets.first["id"]
   end
 
-  # Same fix as validate_github_repository_access! above — was calling
+  # Same fix as github_token_valid? above — was calling
   # Homebrew's own internal GitHub client (GitHub.get_release) with no
   # way to pass @github_token in, so it silently depended on Homebrew's
   # own ambient credential state instead of the token actually entered.
